@@ -43,7 +43,7 @@ func AddToCartHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cartRequest, err := http.NewRequest(http.MethodPost, cartServiceURL+"/cart", bytes.NewBuffer(jsonData))
+	cartRequest, err := http.NewRequest(http.MethodPost, cartServiceURL+"/add-to-cart", bytes.NewBuffer(jsonData))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -1,25 +1,53 @@
-package cart
+package main
 
 import (
-	"context"
+	"encoding/json"
+	"log"
+	"net/http"
+	"text/template"
 
-	"github.com/redis/go-redis/v9"
+	"mysite.com/carts/models"
 )
 
-var Client *redis.Client
-
-func init() {
-	// connect to redis
-	Client = redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "",
-		DB:       0,
-	})
+type Product struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Price string `json:"price"`
 }
 
-// Add to Cart
-func AddToCart(product string) error {
-	ctx := context.Background()
-	_, err := Client.RPush(ctx, "cart", product).Result()
-	return err
+var cartTemplate = template.Must(template.ParseFiles("cart.html"))
+
+func AddToCartHandler(w http.ResponseWriter, r *http.Request) {
+	var product Product
+	err := json.NewDecoder(r.Body).Decode(&product)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err = models.AddToCart(product.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func GetCartHandler(w http.ResponseWriter, r *http.Request) {
+	cart, err := models.GetCart()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	cartTemplate.Execute(w, cart)
+}
+
+func main() {
+	http.HandleFunc("/carts", GetCartHandler)
+	http.HandleFunc("/add-to-cart", AddToCartHandler)
+
+	log.Println("Starting server on :3002")
+	log.Fatal(http.ListenAndServe(":3002", nil))
 }

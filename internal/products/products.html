@@ -4,7 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Products</title>
-    <link rel="stylesheet" href="/static/css/styles.css">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f0f0f0; }
+        .container { max-width: 800px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #333; }
+        .product-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
+        .product { border: 1px solid #ddd; border-radius: 4px; padding: 10px; text-align: center; }
+        .product img { max-width: 100%; height: auto; }
+        .product button { background-color: #28a745; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+        .product button:hover { background-color: #218838; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 20px; }
+        .nav a { text-decoration: none; color: #007bff; }
+    </style>
 </head>
 <body>
     <div class="container">
