@@ -2,18 +2,71 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"html/template"
 	"log"
 	"net/http"
+	"time"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
+	tracesdk "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.15.0"
 	"mysite.com/products/models"
 )
 
 var productsTemplate = template.Must(template.ParseFiles("products.html"))
 var cartServiceURL = "http://localhost:3002"
 
+func init() {
+	initTracer()
+}
+
+func initTracer() func(context.Context) error {
+	ctx := context.Background()
+
+	exporter, err := otlptracehttp.New(ctx,
+		otlptracehttp.WithEndpoint("localhost:4318"),
+		otlptracehttp.WithInsecure(),
+	)
+	if err != nil {
+		log.Fatalf("Failed to create exporter: %v", err)
+	}
+
+	tp := tracesdk.NewTracerProvider(
+		tracesdk.WithBatcher(exporter),
+		tracesdk.WithResource(resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceNameKey.String("product-service"),
+			attribute.String("environment", "development"),
+		)),
+	)
+
+	otel.SetTracerProvider(tp)
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
+
+	log.Println("OpenTelemetry tracer initialized")
+
+	return func(ctx context.Context) error {
+		ctx, cancel := context.WithTimeout(ctx, time.Second*5)
+		defer cancel()
+		if err := tp.Shutdown(ctx); err != nil {
+			log.Printf("Error shutting down tracer provider: %v", err)
+			return err
+		}
+		log.Println("Tracer provider shut down")
+		return nil
+	}
+}
+
 func ProductsHandler(w http.ResponseWriter, r *http.Request) {
+	_, span := otel.Tracer("product-service").Start(r.Context(), "ProductsHandler")
+	defer span.End()
+
 	products, err := models.GetProducts()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -23,6 +76,8 @@ func ProductsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func AddToCartHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, span := otel.Tracer("product-service").Start(r.Context(), "AddToCartHandler")
+	defer span.End()
 
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
@@ -43,18 +98,22 @@ func AddToCartHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cartRequest, err := http.NewRequest(http.MethodPost, cartServiceURL+"/add-to-cart", bytes.NewBuffer(jsonData))
+	cartRequest, err := http.NewRequestWithContext(ctx, http.MethodPost, cartServiceURL+"/add-to-cart", bytes.NewBuffer(jsonData))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	cartRequest.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(cartRequest)
 
+	// Inject the trace context into the outgoing request
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(cartRequest.Header))
+
+	resp, err := http.DefaultClient.Do(cartRequest)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		http.Error(w, "Error adding to cart", http.StatusInternalServerError)
