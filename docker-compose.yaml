@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  product:
+    image: saumyashah40/go-micro-and-observability-product:latest
+    depends_on:
+      - redis
+      - jaeger
+    ports:
+      - "3001:3001"
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4318
+      - OTEL_SERVICE_NAME=product-service
+
+  cart:
+    image: saumyashah40/go-micro-and-observability-cart:latest
+    depends_on:
+      - product
+      - redis
+      - jaeger
+    ports:
+      - "3002:3002"
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4318
+      - OTEL_SERVICE_NAME=cart-service
+
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - product
+      - cart
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      - "5778:5778"
+      - "16686:16686"
+      - "4317:4317"
+      - "4318:4318"
+      - "14250:14250"
+      - "14268:14268"
+      - "14269:14269"
+      - "9411:9411"
+
+networks:
+  default:
+    name: microservices-network

@@ -17,7 +17,7 @@ type Product struct {
 func init() {
 	// connect to redis
 	Client = redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
+		Addr:     "redis:6379",
 		Password: "redispw",
 		DB:       0,
 		Username: "default",

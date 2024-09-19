@@ -7,6 +7,6 @@ RUN go build -o main .
 
 FROM alpine:3.20 AS final
 WORKDIR /app
-COPY --from=builder /app/main .
-EXPOSE 8080
+COPY --from=builder /app/main /app/cart.html .
+EXPOSE 3002
 CMD ["./main"]
