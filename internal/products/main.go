@@ -21,9 +21,14 @@ import (
 )
 
 var productsTemplate = template.Must(template.ParseFiles("products.html"))
-var cartServiceURL = "http://localhost:3002"
+var cartServiceURL string
 
 func init() {
+	cartServiceURL = os.Getenv("CART_SERVICE_URL")
+	if cartServiceURL == "" {
+		cartServiceURL = "http://localhost:3002"
+	}
+
 	initTracer()
 }
 
